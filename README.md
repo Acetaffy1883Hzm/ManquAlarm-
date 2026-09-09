@@ -6,7 +6,7 @@
 
 **Android 8.0 及以上 · 当前版本 1.0.5 · 包名 `dev.hazel.livealarm`**
 
-[直接下载 APK](https://github.com/Acetaffy1883Hzm/ManquAlarm-/raw/refs/heads/main/release/v1.0.5/ManquAlarm-1.0.5.apk) · [全部下载文件](release/v1.0.5/) · [更新说明](CHANGELOG.md) · [使用说明](docs/USAGE.md) · [构建方法](docs/BUILDING.md) · [数据说明](docs/PRIVACY.md)
+[直接下载 APK](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/download/v1.0.5/ManquAlarm-1.0.5.apk) · [正式发布页](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/tag/v1.0.5) · [备用下载目录](release/v1.0.5/) · [更新说明](CHANGELOG.md) · [使用说明](docs/USAGE.md) · [构建方法](docs/BUILDING.md) · [数据说明](docs/PRIVACY.md)
 
 ## 下载 1.0.5
 
@@ -14,9 +14,9 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| [ManquAlarm-1.0.5.apk](https://github.com/Acetaffy1883Hzm/ManquAlarm-/raw/refs/heads/main/release/v1.0.5/ManquAlarm-1.0.5.apk) | 安卓安装包，下载后直接安装，约 9.9 MB |
-| [ManquAlarm-1.0.5.zip](https://github.com/Acetaffy1883Hzm/ManquAlarm-/raw/refs/heads/main/release/v1.0.5/ManquAlarm-1.0.5.zip) | 同一个 APK 的压缩包，解压后安装 |
-| [ManquAlarm-1.0.5-Public-Source.zip](https://github.com/Acetaffy1883Hzm/ManquAlarm-/raw/refs/heads/main/release/v1.0.5/ManquAlarm-1.0.5-Public-Source.zip) | 公开源码，供查看和自行构建 |
+| [ManquAlarm-1.0.5.apk](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/download/v1.0.5/ManquAlarm-1.0.5.apk) | 安卓安装包，下载后直接安装，约 9.9 MB |
+| [ManquAlarm-1.0.5.zip](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/download/v1.0.5/ManquAlarm-1.0.5.zip) | 同一个 APK 的压缩包，解压后安装 |
+| [ManquAlarm-1.0.5-Public-Source.zip](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/download/v1.0.5/ManquAlarm-1.0.5-Public-Source.zip) | 公开源码，供查看和自行构建 |
 | [SHA256SUMS](release/v1.0.5/SHA256SUMS) | 上述三个文件的 SHA-256 校验值 |
 
 安装包保留原签名。已有相同包名、相同签名版本时可以覆盖升级。
