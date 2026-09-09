@@ -1,0 +1,57 @@
+name: Publish ManquAlarm 1.0.5 once
+
+# Remove this workflow after the Release has been verified.
+# It only publishes the already reviewed files from the fixed commit below.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v1.0.5-once.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-manqualarm-v1.0.5-once
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Acetaffy1883Hzm/ManquAlarm-' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the verified release files
+        uses: actions/checkout@v7
+        with:
+          ref: 6f647aa2ee260c408ba6019b4949e536e198c6c8
+          persist-credentials: false
+
+      - name: Verify APK and archives
+        working-directory: release/v1.0.5
+        run: sha256sum --check SHA256SUMS
+
+      - name: Publish version 1.0.5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.0.5 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo '::error::Release v1.0.5 already exists. Inspect it without overwriting.'
+            exit 1
+          fi
+          gh release create v1.0.5 \
+            release/v1.0.5/ManquAlarm-1.0.5.apk \
+            release/v1.0.5/ManquAlarm-1.0.5.zip \
+            release/v1.0.5/ManquAlarm-1.0.5-Public-Source.zip \
+            release/v1.0.5/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 6f647aa2ee260c408ba6019b4949e536e198c6c8 \
+            --title '满区闹钟 1.0.5' \
+            --notes-file docs/releases/v1.0.5.md \
+            --draft
+          asset_count=$(gh release view v1.0.5 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')
+          test "$asset_count" = 4
+          gh release edit v1.0.5 --repo "$GITHUB_REPOSITORY" --draft=false --latest
