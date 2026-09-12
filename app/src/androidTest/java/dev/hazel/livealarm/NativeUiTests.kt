@@ -57,8 +57,14 @@ class NativeUiTests {
         android.os.SystemClock.sleep(500)
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("Screenshot unavailable")
         val dir = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val output = File(dir, "$name.png")
+        output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
+        // Gradle uninstalls the target after instrumentation, including its external files.
+        // Copy test-only screenshots with the test runner's shell before that cleanup.
+        val copy = instrumentation.uiAutomation.executeShellCommand("mkdir -p /sdcard/Download/ManquAlarm-native-screenshots && cp ${output.absolutePath} /sdcard/Download/ManquAlarm-native-screenshots/ 2>&1")
+        val errors = android.os.ParcelFileDescriptor.AutoCloseInputStream(copy).bufferedReader().use { it.readText() }
+        assertTrue("Cannot preserve screenshot: $errors", errors.isBlank())
     }
     @Test fun a_nativeNavigationAndThemePersistWithoutChangingAlarmRules() {
         scenario.onActivity { a ->
@@ -130,6 +136,24 @@ class NativeUiTests {
             compose.waitUntil(5000) { prefs.config().optBoolean("dynamicColor") }
         }
         screenshot("05-appearance-dark")
+    }
+    @Test fun e_recoveryRestartsEnabledWatchAndAppearanceDoesNotRestartIt() {
+        var armedAt = 0L
+        scenario.onActivity {
+            val tomorrow = 1 shl (java.time.LocalDate.now().dayOfWeek.value % 7)
+            val window = JSONObject().put("id", "test-window").put("name", "测试时段").put("start", 1).put("end", 2).put("days", tomorrow).put("enabled", true)
+            prefs.update(JSONObject().put("allDay", false).put("windows", org.json.JSONArray().put(window)).put("pollSeconds", 15))
+            prefs.setEnabled(true); armedAt = prefs.raw().getLong("armedAt", 0)
+            WatchRecovery.receive(context)
+        }
+        compose.waitUntil(10000) { GuardianService.running && prefs.raw().getLong("serviceStartedAt", 0) > 0 }
+        val startedAt = prefs.raw().getLong("serviceStartedAt", 0)
+        scenario.onActivity { it.performAction("save", JSONObject().put("seedColor", "#397EB3").put("hideRecents", true)) }
+        assertEquals(startedAt, prefs.raw().getLong("serviceStartedAt", 0))
+        assertEquals(armedAt, prefs.raw().getLong("armedAt", 0))
+        assertEquals(15, prefs.config().optInt("pollSeconds"))
+        assertTrue(prefs.raw().getLong("lastRecovery", 0) > 0)
+        assertTrue(prefs.raw().getLong("recoveryAt", 0) > System.currentTimeMillis())
     }
     @Test fun e_stoppingWatchCancelsRecoveryAndDoesNotResurrectService() {
         scenario.onActivity {

@@ -10,6 +10,12 @@
 
 [直接下载 APK](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/download/v1.0.5/ManquAlarm-1.0.5.apk) · [正式发布页](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/tag/v1.0.5) · [备用下载目录](release/v1.0.5/) · [更新说明](CHANGELOG.md) · [使用说明](docs/USAGE.md) · [构建方法](docs/BUILDING.md) · [数据说明](docs/PRIVACY.md)
 
+## 1.1.0 原生界面预览
+
+原生 Compose 页面、自定义主题色、系统动态颜色、AMOLED 模式、背景图片、最近任务隐藏与定时守候恢复已在开发分支接入。验证成功后提供原生预览 APK；具体状态见上方 CI。
+
+预览包使用独立包名 `dev.hazel.livealarm.preview`，可与旧版并排安装。正式覆盖升级需要原发行签名。详细使用方法见 [原生界面与迁移说明](docs/NATIVE.md)。
+
 ## 下载 1.0.5
 
 普通用户点击第一项即可安装，**不需要下载源码，也不需要解压**。
@@ -67,8 +73,9 @@
 
 欢迎 Fork 后创建分支并提交 PR。代码变更会自动运行 Java 规则测试并编译调试 APK，也支持在 Actions 手动编译；调试包在成功运行的 Artifacts 中提供，普通用户仍从上方下载正式版。
 
-Android 原生 Java 负责检测、服务、音频和权限；界面使用 APK 内的离线 WebView 资源。构建环境与测试命令见 [BUILDING](docs/BUILDING.md)。
+1.1.0 使用 Kotlin / Compose 原生界面，Java 负责检测、服务、音频和权限；旧版网页资源不再打入 APK。构建环境与测试命令见 [BUILDING](docs/BUILDING.md)。
 
 提交问题时提供应用版本、手机型号、Android/系统版本和复现步骤。公开 Issue 优先附设置页状态截图；完整系统日志和包含系统组件 APK 的诊断包不要直接公开，详见 [数据说明](docs/PRIVACY.md)。
 
 图标和角色素材来自项目提供者；仓库公开不代表这些素材可以任意商用，也不改变其原有权利归属。
+
