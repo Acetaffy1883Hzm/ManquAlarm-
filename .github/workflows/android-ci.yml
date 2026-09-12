@@ -1,0 +1,95 @@
+name: Android CI
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'release/**'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Prepare Android SDK 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Compile the offline UI
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build:ui
+
+      - name: Run Java rule tests
+        run: python3 tools/test_core.py
+
+      - name: Compile Android debug APK
+        run: gradle --no-daemon --console=plain :app:assembleDebug
+
+      - name: Verify and package the APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p build/ci
+          cp app/build/outputs/apk/debug/app-debug.apk build/ci/ManquAlarm-debug.apk
+          printf 'Commit: %s\nRun: %s\nVariant: debug\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > build/ci/BUILD-INFO.txt
+          cd build/ci
+          sha256sum ManquAlarm-debug.apk > SHA256SUMS
+
+      - name: Upload the compiled APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: ManquAlarm-debug-${{ github.run_number }}-${{ github.run_attempt }}
+          path: build/ci/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Show download instructions
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ## 编译完成
+
+          在本次运行页面底部的 **Artifacts** 下载 `ManquAlarm-debug-*`，解压后可找到 APK、SHA-256 和构建信息。
+
+          这是开发调试包，签名与正式版不同，不能直接覆盖正式版。普通用户请使用仓库 Releases 中的安装包。
+          SUMMARY

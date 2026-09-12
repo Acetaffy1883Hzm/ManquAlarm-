@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安装与使用说明
+    url: https://github.com/Acetaffy1883Hzm/ManquAlarm-/blob/main/docs/USAGE.md
+    about: 查看通知、时段、铃声和后台守候的设置方法。
+  - name: 下载正式 APK
+    url: https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/latest
+    about: 普通用户请从 Releases 下载可直接安装的正式版本。

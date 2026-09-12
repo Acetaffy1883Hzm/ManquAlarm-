@@ -1,5 +1,7 @@
 # 满区闹钟 · ManquAlarm
 
+[![Android CI](https://github.com/Acetaffy1883Hzm/ManquAlarm-/actions/workflows/android-ci.yml/badge.svg?branch=main)](https://github.com/Acetaffy1883Hzm/ManquAlarm-/actions/workflows/android-ci.yml)
+
 <img src="app/src/main/assets/hazel.png" width="104" alt="满区闹钟图标">
 
 为灰泽满 Hazel 的 B 站直播准备的安卓开播闹钟。选择想被提醒的时间、所在时区和喜欢的铃声，开启守候后检测直播状态。
@@ -60,6 +62,10 @@
 - 本版本已完成界面与规则测试，未覆盖所有机型、真实开播、长期锁屏和耗电场景。具体范围见 [验证记录](docs/TESTING.md)。
 
 ## 开发与反馈
+
+[提出功能建议](https://github.com/Acetaffy1883Hzm/ManquAlarm-/issues/new?template=feature_request.yml) · [反馈问题](https://github.com/Acetaffy1883Hzm/ManquAlarm-/issues/new?template=bug_report.md) · [分支与 PR 贡献指南](CONTRIBUTING.md) · [CI 自动编译](https://github.com/Acetaffy1883Hzm/ManquAlarm-/actions/workflows/android-ci.yml)
+
+欢迎 Fork 后创建分支并提交 PR。代码变更会自动运行 Java 规则测试并编译调试 APK，也支持在 Actions 手动编译；调试包在成功运行的 Artifacts 中提供，普通用户仍从上方下载正式版。
 
 Android 原生 Java 负责检测、服务、音频和权限；界面使用 APK 内的离线 WebView 资源。构建环境与测试命令见 [BUILDING](docs/BUILDING.md)。
 

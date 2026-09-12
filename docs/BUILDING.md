@@ -24,7 +24,15 @@ gradle :app:assembleDebug
 
 调试 APK 位于 `app/build/outputs/apk/debug/`。`assembleRelease` 默认不配置发行签名；发行时可在 Android Studio 选择自己的密钥签名。
 
-Gradle 路径未在本次发布环境完整执行；现有发行 APK 使用下述独立 SDK 构建流程产出。请勿把版本兼容说明当作已执行的 CI 结果。
+仓库已配置 [Android CI](https://github.com/Acetaffy1883Hzm/ManquAlarm-/actions/workflows/android-ci.yml)，使用上述 Gradle 环境构建调试 APK。每次提交的编译结果以对应 Actions 运行记录为准；现有 1.0.5 正式发行 APK 使用下述独立 SDK 构建流程产出。
+
+## GitHub CI 与手动编译
+
+代码分支推送、Pull Request 会触发构建；纯 Markdown、`docs/` 和 `release/` 改动不触发。维护者可打开 **Actions → Android CI → Run workflow**，选择分支手动编译。
+
+流水线依次编译离线界面、运行 `tools/test_core.py` 的现有 Java 测试、执行 `:app:assembleDebug` 并核验 APK 签名。构建成功后，在运行页面底部 **Artifacts** 下载 `ManquAlarm-debug-*`，解压可得到 `ManquAlarm-debug.apk`、`SHA256SUMS` 与 `BUILD-INFO.txt`。产物保留 14 天。
+
+CI 调试包与正式 APK 的签名不同，不能直接覆盖正式版。该工作流不使用原发行私钥，不会发布 Releases；普通用户仍使用已发布的正式安装包。
 
 ## 修改界面
 
