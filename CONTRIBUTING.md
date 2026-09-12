@@ -22,14 +22,15 @@
 
 代码分支推送和 Pull Request 会触发 **Android CI**；仅修改 Markdown、`docs/` 或 `release/` 时跳过自动编译。维护者可在 **Actions → Android CI → Run workflow** 手动选择分支编译。
 
-工作流会编译离线界面、运行现有 Java 规则测试，再使用 JDK 17、Gradle 8.11.1 和 Android SDK 35 生成调试 APK。成功后可从该次运行的 **Artifacts** 下载 `ManquAlarm-debug-*`，产物保留 14 天。
+工作流先运行 Java 规则测试，再使用 JDK 17、Gradle 8.11.1 和 Android SDK 35 编译原生 Compose 界面，并在 Android 15 模拟器执行界面和守候恢复测试。成功后可从该次运行的 **Artifacts** 下载 `ManquAlarm-native-preview-*`；测试报告和截图位于 `Native-UI-verification-*`，产物保留 14 天。
 
 首次从外部 Fork 提交的 PR 如显示等待批准，需要仓库维护者在 GitHub 批准该次工作流。该 CI 只读取仓库内容，不使用发行签名私钥，也不会自动发布正式版本。
 
-CI 调试包使用调试签名，不能直接覆盖原签名正式版。普通用户请下载 [正式 Releases](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/latest)。
+CI 预览包使用独立包名 `dev.hazel.livealarm.preview` 和调试签名，可与旧版并排安装。它不能迁移旧版的私有数据或覆盖原签名正式版；迁移说明见 [原生界面说明](docs/NATIVE.md)。稳定版本请下载 [正式 Releases](https://github.com/Acetaffy1883Hzm/ManquAlarm-/releases/latest)。
 
 ## 提交前
 
-修改 `ui-src/app.js` 后执行 `npm run build:ui`，一并提交生成的界面脚本。测试时请写明实际验证范围；通知权限、长时间锁屏和真实开播仍需设备测试。
+原生界面位于 `app/src/main/java/dev/hazel/livealarm/NativeUi.kt` 和 `NativeTheme.kt`。`ui-src/` 仅保留旧版参考，1.1.0 不打包旧网页资源。按照 [构建说明](docs/BUILDING.md) 执行规则测试、APK 编译和设备测试。测试时请写明实际验证范围；通知权限、长时间锁屏和真实开播仍需手机验证。
 
 私人诊断与签名材料的处理遵循 [数据说明](docs/PRIVACY.md)。图标和角色素材继续保留原有权利归属。
+

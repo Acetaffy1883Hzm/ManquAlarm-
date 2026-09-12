@@ -25,7 +25,7 @@ jobs:
   build:
     name: Test and build debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -44,28 +44,46 @@ jobs:
           gradle-version: '8.11.1'
           cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
 
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          package-manager-cache: false
-
       - name: Prepare Android SDK 35
         uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: '12266719'
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - name: Compile the offline UI
-        run: |
-          npm install --no-package-lock --no-audit --no-fund
-          npm run build:ui
-
       - name: Run Java rule tests
         run: python3 tools/test_core.py
 
       - name: Compile Android debug APK
-        run: gradle --no-daemon --console=plain :app:assembleDebug
+        run: gradle --no-daemon --console=plain :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Test the native interface on Android 15
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: bash tools/test_android.sh
+
+      - name: Upload native test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Native-UI-verification-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            build/native-screenshots/
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Verify and package the APK
         shell: bash
@@ -73,15 +91,15 @@ jobs:
           set -euo pipefail
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
           mkdir -p build/ci
-          cp app/build/outputs/apk/debug/app-debug.apk build/ci/ManquAlarm-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk build/ci/ManquAlarm-1.1.0-native-preview.apk
           printf 'Commit: %s\nRun: %s\nVariant: debug\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > build/ci/BUILD-INFO.txt
           cd build/ci
-          sha256sum ManquAlarm-debug.apk > SHA256SUMS
+          sha256sum ManquAlarm-1.1.0-native-preview.apk > SHA256SUMS
 
       - name: Upload the compiled APK
         uses: actions/upload-artifact@v7
         with:
-          name: ManquAlarm-debug-${{ github.run_number }}-${{ github.run_attempt }}
+          name: ManquAlarm-native-preview-${{ github.run_number }}-${{ github.run_attempt }}
           path: build/ci/
           if-no-files-found: error
           retention-days: 14
@@ -92,7 +110,7 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
           ## 编译完成
 
-          在本次运行页面底部的 **Artifacts** 下载 `ManquAlarm-debug-*`，解压后可找到 APK、SHA-256 和构建信息。
+          在本次运行页面底部的 **Artifacts** 下载 `ManquAlarm-native-preview-*`，解压后可找到 APK、SHA-256 和构建信息。
 
-          这是开发调试包，签名与正式版不同，不能直接覆盖正式版。普通用户请使用仓库 Releases 中的安装包。
+          原生预览包使用独立包名 dev.hazel.livealarm.preview，可与 1.0.5 并排安装；不覆盖旧版。正式版覆盖升级需要原发行签名。测试不等于真实手机整夜锁屏和实际开播验证。
           SUMMARY
