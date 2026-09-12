@@ -62,9 +62,14 @@ class NativeUiTests {
         bitmap.recycle()
         // Gradle uninstalls the target after instrumentation, including its external files.
         // Copy test-only screenshots with the test runner's shell before that cleanup.
-        val copy = instrumentation.uiAutomation.executeShellCommand("mkdir -p /sdcard/Download/ManquAlarm-native-screenshots && cp ${output.absolutePath} /sdcard/Download/ManquAlarm-native-screenshots/ 2>&1")
-        val errors = android.os.ParcelFileDescriptor.AutoCloseInputStream(copy).bufferedReader().use { it.readText() }
-        assertTrue("Cannot preserve screenshot: $errors", errors.isBlank())
+        fun shell(command: String): String = android.os.ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand(command)
+        ).bufferedReader().use { it.readText() }
+        // UiAutomation executes an argv command, so shell operators such as && are not parsed.
+        val destination = "/sdcard/Download/ManquAlarm-native-screenshots"
+        shell("mkdir -p $destination")
+        shell("cp ${output.absolutePath} $destination/$name.png")
+        assertTrue("Cannot preserve screenshot $name", shell("ls $destination/$name.png").contains("$name.png"))
     }
     @Test fun a_nativeNavigationAndThemePersistWithoutChangingAlarmRules() {
         scenario.onActivity { a ->

@@ -9,4 +9,9 @@ adb pull /sdcard/Download/ManquAlarm-native-screenshots build/native-screenshots
 if [ "$test_status" -ne 0 ]; then
   exit "$test_status"
 fi
-exit "$capture_status"
+if [ "$capture_status" -ne 0 ]; then
+  exit "$capture_status"
+fi
+for screenshot in 01-home-pink 02-appearance-blue 03-custom-background 04-native-schedule-dark 05-appearance-dark 06-native-alarm; do
+  test -s "build/native-screenshots/ManquAlarm-native-screenshots/$screenshot.png"
+done
