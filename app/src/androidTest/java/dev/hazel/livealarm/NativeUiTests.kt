@@ -11,6 +11,8 @@ import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -55,6 +57,8 @@ class NativeUiTests {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         android.os.SystemClock.sleep(500)
+        // A preference callback may arrive during that pause; render its Compose frame too.
+        compose.waitForIdle()
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("Screenshot unavailable")
         val dir = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         val output = File(dir, "$name.png")
@@ -71,12 +75,26 @@ class NativeUiTests {
         shell("cp ${output.absolutePath} $destination/$name.png")
         assertTrue("Cannot preserve screenshot $name", shell("ls $destination/$name.png").contains("$name.png"))
     }
+    private fun assertReadableDarkText(label: String) {
+        compose.onNodeWithText(label).performScrollTo().assertIsDisplayed()
+        compose.waitUntil(5000) {
+            val pixels = compose.onNodeWithText(label).captureToImage().toPixelMap()
+            var bright = 0; var dark = 0
+            for (x in 0 until pixels.width) for (y in 0 until pixels.height) {
+                val luminance = pixels[x, y].luminance()
+                if (luminance > .6f) bright++
+                if (luminance < .15f) dark++
+            }
+            bright > 10 && dark > pixels.width * pixels.height / 2
+        }
+    }
     @Test fun a_nativeNavigationAndThemePersistWithoutChangingAlarmRules() {
         scenario.onActivity { a ->
             fun hasWeb(view: View): Boolean = view is WebView || view is ViewGroup && (0 until view.childCount).any { hasWeb(view.getChildAt(it)) }
             assertFalse("Native app must not create a WebView", hasWeb(a.window.decorView))
             a.performAction("save", JSONObject().put("pollSeconds", 15).put("timezone", "Asia/Tokyo").put("ringtone", "morning"))
         }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("15 秒").fetchSemanticsNodes().isNotEmpty() }
         screenshot("01-home-pink")
         appearance()
         compose.onNodeWithTag("hex_picker").performScrollTo().performClick()
@@ -134,12 +152,18 @@ class NativeUiTests {
         compose.onNodeWithTag("save_rule").performClick()
         compose.waitUntil(5000) { prefs.config().optJSONArray("windows")!!.length() == 2 }
         scenario.onActivity { it.performAction("save", JSONObject().put("theme", "dark").put("amoled", true).put("seedColor", "#A65C83")) }
+        assertReadableDarkText("全天提醒")
+        assertReadableDarkText("周末提醒")
+        compose.onNodeWithTag("all_day").performScrollTo()
         screenshot("04-native-schedule-dark")
         appearance()
         if (android.os.Build.VERSION.SDK_INT >= 31) {
             compose.onNodeWithTag("dynamic_color").performScrollTo().performClick()
             compose.waitUntil(5000) { prefs.config().optBoolean("dynamicColor") }
         }
+        assertReadableDarkText("配色方案")
+        if (android.os.Build.VERSION.SDK_INT >= 31) assertReadableDarkText("动态颜色")
+        compose.onNodeWithTag("hex_picker").performScrollTo()
         screenshot("05-appearance-dark")
     }
     @Test fun e_recoveryRestartsEnabledWatchAndAppearanceDoesNotRestartIt() {

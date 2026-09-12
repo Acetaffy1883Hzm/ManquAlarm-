@@ -154,7 +154,7 @@ internal fun NativeApp(host: MainActivity, state: JSONObject, alarm: Boolean) {
     bitmap?.let { Image(it.asImageBitmap(), "灰泽满", modifier.clip(RoundedCornerShape(24.dp)), contentScale = ContentScale.Fit) }
 }
 @Composable private fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = LocalCardAlpha.current))) {
+    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = LocalCardAlpha.current), contentColor = MaterialTheme.colorScheme.onSurface)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
@@ -189,7 +189,7 @@ internal fun NativeApp(host: MainActivity, state: JSONObject, alarm: Boolean) {
     val enabled = state.optBoolean("enabled"); val running = state.optBoolean("running")
     val error = state.optString("networkError").ifEmpty { state.optString("serviceError") }
     val status = when { error.isNotEmpty() -> "等待恢复"; snap.optLong("checkedAt") == 0L -> "尚未检测"; System.currentTimeMillis() - snap.optLong("checkedAt") > maxOf(300000L, c.optInt("pollSeconds",30) * 4000L) -> "状态待更新"; snap.optInt("status") == 1 -> "正在直播"; snap.optInt("status") == 2 -> "轮播中 · 不触发提醒"; else -> "暂未开播" }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .94f)), shape = RoundedCornerShape(30.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .94f), contentColor = MaterialTheme.colorScheme.onPrimaryContainer), shape = RoundedCornerShape(30.dp)) {
         Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("灰泽满 HAZEL", style = MaterialTheme.typography.labelMedium)

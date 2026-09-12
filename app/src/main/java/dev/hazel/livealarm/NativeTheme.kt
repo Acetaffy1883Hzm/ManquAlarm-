@@ -36,5 +36,7 @@ internal fun NativeTheme(config: JSONObject, content: @Composable () -> Unit) {
             onBackground = Color(0xFF241D26), onSurface = Color(0xFF241D26), onSurfaceVariant = Color(0xFF665B68), outline = Color(0xFF928593))
     }
     if (dark && config.optBoolean("amoled")) scheme = scheme.copy(background = Color.Black, surface = Color.Black, surfaceVariant = Color(0xFF161316))
-    MaterialTheme(colorScheme = scheme, shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(28.dp), extraLarge = RoundedCornerShape(32.dp)), content = content)
+    MaterialTheme(colorScheme = scheme, shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(28.dp), extraLarge = RoundedCornerShape(32.dp))) {
+        CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+    }
 }
