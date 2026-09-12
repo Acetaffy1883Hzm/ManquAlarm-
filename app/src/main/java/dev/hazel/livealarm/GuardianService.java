@@ -50,6 +50,7 @@ public class GuardianService extends Service {
     /** Explicit stop never starts a new foreground service merely to stop it. */
     public static void stopWatching(Context c){
         Prefs p=new Prefs(c);p.setEnabled(false);
+        WatchRecovery.cancel(c);
         p.raw().edit().putLong("testAt",0).putLong("snoozeAt",0).putString("snoozeSession","").putLong("nextCheck",0).apply();
         AlarmScheduler.cancel(c,AlarmScheduler.BOUNDARY);AlarmScheduler.cancel(c,AlarmScheduler.SNOOZE);AlarmScheduler.cancel(c,AlarmScheduler.TEST);
         c.stopService(new Intent(c,GuardianService.class));
@@ -90,6 +91,7 @@ public class GuardianService extends Service {
         filter.addAction(NotificationManager.ACTION_NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED);
         try{if(Build.VERSION.SDK_INT>=33)registerReceiver(notificationChanges,filter,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(notificationChanges,filter);}
         catch(RuntimeException e){notificationChanges=null;prefs.log("warning","通知状态监听不可用","返回应用及守候检查时仍会重新读取权限");}
+        WatchRecovery.schedule(this,false);
         handler.postDelayed(heartbeat,30000);
     }
     private void foreground(int id,Notification n){if(Build.VERSION.SDK_INT>=34)startForeground(id,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);else startForeground(id,n);}
@@ -140,7 +142,7 @@ public class GuardianService extends Service {
         if("TEST".equals(action)){cancelTest();beginAlarm("请确认锁屏、音量和振动是否符合预期",true);if(prefs.enabled()){AlarmScheduler.boundaries(this);check(false);}return prefs.enabled()?START_STICKY:START_NOT_STICKY;}
         if("CANCEL_TEST".equals(action)){cancelTest();if(testing)finishAlarm("dismiss",false);if(!prefs.enabled()&&!ringing)stopSelf();return prefs.enabled()?START_STICKY:START_NOT_STICKY;}
         if("SNOOZE_FIRE".equals(action)){snoozeCheck=true;check(true);return prefs.enabled()?START_STICKY:START_NOT_STICKY;}
-        if(prefs.enabled()){syncPower();AlarmScheduler.boundaries(this);refreshNotices(false);check(false);return START_STICKY;}
+        if(prefs.enabled()){WatchRecovery.schedule(this,false);syncPower();AlarmScheduler.boundaries(this);refreshNotices(false);check(false);return START_STICKY;}
         if(!ringing)stopSelf();return START_NOT_STICKY;
     }
     private void snoozeAlarm(){
@@ -319,6 +321,7 @@ public class GuardianService extends Service {
     private void cancelTest(){AlarmScheduler.cancel(this,AlarmScheduler.TEST);prefs.raw().edit().putLong("testAt",0).apply();}
     private void release(PowerManager.WakeLock lock){try{if(lock!=null&&lock.isHeld())lock.release();}catch(Exception ignored){}}
     @Override public IBinder onBind(Intent i){return null;}
-    @Override public void onTaskRemoved(Intent rootIntent){prefs.log("system","应用页面已划走",prefs.enabled()?"前台守候继续运行；系统仍可按后台策略限制服务":"守候未开启");super.onTaskRemoved(rootIntent);}
-    @Override public void onDestroy(){destroyed=true;running=false;generation++;if(active.get()==this)active.clear();handler.removeCallbacksAndMessages(null);finishAlarm("destroy",true);release(watchLock);if(notificationChanges!=null)try{unregisterReceiver(notificationChanges);}catch(Exception ignored){}if(connectivity!=null&&networkCallback!=null)try{connectivity.unregisterNetworkCallback(networkCallback);}catch(Exception ignored){}io.shutdownNow();super.onDestroy();}
+    @Override public void onTaskRemoved(Intent rootIntent){if(prefs.enabled())WatchRecovery.schedule(this,false);prefs.log("system","应用页面已划走",prefs.enabled()?"前台守候继续运行；系统仍可按后台策略限制服务":"守候未开启");super.onTaskRemoved(rootIntent);}
+    @Override public void onDestroy(){destroyed=true;running=false;generation++;if(active.get()==this)active.clear();handler.removeCallbacksAndMessages(null);finishAlarm("destroy",true);release(watchLock);if(notificationChanges!=null)try{unregisterReceiver(notificationChanges);}catch(Exception ignored){}if(connectivity!=null&&networkCallback!=null)try{connectivity.unregisterNetworkCallback(networkCallback);}catch(Exception ignored){}io.shutdownNow();if(prefs.enabled())WatchRecovery.schedule(this,false);super.onDestroy();}
 }
+

@@ -11,7 +11,7 @@ import android.net.*;
 import android.os.*;
 import android.provider.*;
 import android.view.*;
-import android.webkit.*;
+import androidx.activity.ComponentActivity;
 import android.widget.*;
 import org.json.*;
 import java.io.*;
@@ -19,21 +19,22 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class MainActivity extends Activity {
-    private static final String HOST="appassets.androidplatform.net", BASE="https://"+HOST+"/assets/";
-    private static final int AUDIO=50,EXPORT=51,IMPORT=52,NOTIFICATION_REPORT=53,COMPONENT_REPORT=54,NOTIFICATIONS=80;
-    protected WebView web;protected Prefs prefs;private FrameLayout root;
+public class NativeHostActivity extends ComponentActivity {
+    private static final int AUDIO=50,EXPORT=51,IMPORT=52,NOTIFICATION_REPORT=53,COMPONENT_REPORT=54,BACKGROUND=55,NOTIFICATIONS=80;
+    protected Prefs prefs;
+    private SharedPreferences.OnSharedPreferenceChangeListener preferenceListener;
+    private final Runnable stateRefresh=()->{if(this.resumed&&!isFinishing())onNativeState(state());};
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private String pendingExport="";private boolean refreshing=false;private long refreshAt=0;
     private final Handler permissionHandler=new Handler(Looper.getMainLooper());
     private boolean resumed=false,notificationRequestInFlight=false;
-    private final Runnable permissionRefresh=()->{if(resumed&&web!=null){GuardianService.refreshNotifications();push();}};
-    private static java.lang.ref.WeakReference<MainActivity> visible=new java.lang.ref.WeakReference<>(null);
+    private final Runnable permissionRefresh=()->{if(resumed){GuardianService.refreshNotifications();push();}};
+    private static java.lang.ref.WeakReference<NativeHostActivity> visible=new java.lang.ref.WeakReference<>(null);
     private boolean alarmOpening=false;
     private long notificationRequestBegan=0;
     // Only an already-visible activity can reveal the alarm. No background activity launch.
     static boolean revealAlarm(){
-        MainActivity a=visible.get();
+        NativeHostActivity a=visible.get();
         if(a==null||!a.resumed||a.isFinishing()||!a.hasWindowFocus())return false;
         GuardianService.hideAlarmOverlay();a.push();
         if(GuardianService.ringing&&!a.alarmPage()&&!a.alarmOpening){
@@ -43,64 +44,67 @@ public class MainActivity extends Activity {
         return true;
     }
     protected boolean alarmPage(){return false;}
-    @Override public void onCreate(Bundle state){
-        super.onCreate(state);prefs=new Prefs(this);GuardianService.channels(this);
-        if(alarmPage()){if(Build.VERSION.SDK_INT>=27){setShowWhenLocked(true);setTurnScreenOn(true);}else getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}
-        root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(245,245,240));
-        web=new WebView(this);root.addView(web,new FrameLayout.LayoutParams(-1,-1));setContentView(root);
-        if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
-        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        root.setOnApplyWindowInsetsListener((view,insets)->{
-            if(Build.VERSION.SDK_INT>=30){android.graphics.Insets p=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());view.setPadding(p.left,p.top,p.right,p.bottom);}
-            else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
-            return insets;
-        });
-        WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(false);
-        settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setSupportMultipleWindows(false);settings.setMediaPlaybackRequiresUserGesture(true);web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        web.setWebViewClient(new WebViewClient(){
-            @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest r){return !r.getUrl().toString().equals(BASE+(alarmPage()?"alarm.html":"index.html"));}
-            @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest r){
-                Uri u=r.getUrl();String path=u.getPath();
-                if(!"https".equals(u.getScheme())||!HOST.equals(u.getHost())||path==null||!path.startsWith("/assets/")||path.contains(".."))return emptyResponse();
-                String file=path.substring(8);String mime=file.endsWith(".html")?"text/html":file.endsWith(".js")?"application/javascript":file.endsWith(".css")?"text/css":file.endsWith(".png")?"image/png":"text/plain";
-                try{Map<String,String> headers=new HashMap<>();headers.put("Cache-Control","no-store");headers.put("X-Content-Type-Options","nosniff");return new WebResourceResponse(mime,"UTF-8",200,"OK",headers,getAssets().open(file));}catch(IOException e){return emptyResponse();}
+    @Override public void onCreate(Bundle saved){
+        super.onCreate(saved);prefs=new Prefs(this);GuardianService.channels(this);
+        if(alarmPage()){
+            if(Build.VERSION.SDK_INT>=27){setShowWhenLocked(true);setTurnScreenOn(true);}
+            else getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+        preferenceListener=(db,key)->{
+            if(key!=null&&Arrays.asList("config","enabled","snapshot","networkError","serviceError","nextCheck","alarmUntil","alarmTitle","alarmTest","testAt","snoozeAt","customName","backgroundPath","backgroundName","recoveryAt","lastSuccess","serviceHeartbeatAt","history").contains(key))push();
+        };
+        prefs.raw().registerOnSharedPreferenceChangeListener(preferenceListener);
+        applyRecents();
+    }
+    protected void onNativeState(JSONObject value){}
+    public JSONObject readNativeState(){return state();}
+    public Object performAction(String action,JSONObject data)throws Exception{
+        Object result=dispatch(action,data);push();return result;
+    }
+    protected void applyTheme(){applyRecents();push();}
+    public void applyRecents(){
+        if(prefs==null)return;
+        try{
+            ActivityManager manager=(ActivityManager)getSystemService(ACTIVITY_SERVICE);
+            for(ActivityManager.AppTask task:manager.getAppTasks()){
+                ActivityManager.RecentTaskInfo info=task.getTaskInfo();
+                boolean alarm=info.baseActivity!=null&&info.baseActivity.getClassName().equals(AlarmActivity.class.getName());
+                task.setExcludeFromRecents(alarm||prefs.config().optBoolean("hideRecents",false));
             }
-            @Override public void onPageFinished(WebView view,String url){applyTheme();refreshPermissionsAfterReturn();}
-        });
-        web.addJavascriptInterface(new Bridge(),"HazelNative");applyTheme();web.loadUrl(BASE+(alarmPage()?"alarm.html":"index.html"));
+        }catch(RuntimeException e){toast("系统未能更新最近任务显示，请重新打开应用后重试");}
     }
-    private WebResourceResponse emptyResponse(){return new WebResourceResponse("text/plain","UTF-8",403,"Forbidden",null,new ByteArrayInputStream(new byte[0]));}
-    private void applyTheme(){
-        if(web==null)return;String theme=prefs.config().optString("theme");boolean dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&0x30)==0x20);
-        int color=dark?Color.rgb(24,29,36):Color.rgb(245,245,240);root.setBackgroundColor(color);web.setBackgroundColor(color);getWindow().setStatusBarColor(color);getWindow().setNavigationBarColor(color);
-        if(Build.VERSION.SDK_INT>=30){WindowInsetsController c=getWindow().getInsetsController();if(c!=null)c.setSystemBarsAppearance(dark?0:WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);}
-        else{int flags=web.getSystemUiVisibility();web.setSystemUiVisibility(dark?flags&~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR):flags|View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);}
+    @Override protected void onResume(){
+        super.onResume();resumed=true;visible=new java.lang.ref.WeakReference<>(this);alarmOpening=false;
+        if(prefs!=null){
+            NotificationAccess.record(this,prefs,"activity_resume",true);
+            if(!alarmPage()&&prefs.enabled()&&!GuardianService.running)GuardianService.send(this,"CHECK");
+            if(prefs.enabled())WatchRecovery.schedule(this,false);
+        }
+        applyRecents();refreshPermissionsAfterReturn();
     }
-    @Override protected void onResume(){super.onResume();resumed=true;visible=new java.lang.ref.WeakReference<>(this);alarmOpening=false;if(web!=null)web.onResume();if(prefs!=null){NotificationAccess.record(this,prefs,"activity_resume",true);if(!alarmPage()&&prefs.enabled()&&!GuardianService.running)GuardianService.send(this,"CHECK");}refreshPermissionsAfterReturn();}
-    @Override protected void onPause(){resumed=false;if(visible.get()==this)visible.clear();alarmOpening=false;permissionHandler.removeCallbacks(permissionRefresh);if(web!=null)web.onPause();super.onPause();}
+    @Override protected void onPause(){
+        resumed=false;if(visible.get()==this)visible.clear();alarmOpening=false;
+        permissionHandler.removeCallbacks(permissionRefresh);permissionHandler.removeCallbacks(stateRefresh);super.onPause();
+    }
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&resumed){refreshPermissionsAfterReturn();if(GuardianService.ringing)revealAlarm();}}
-    @Override protected void onDestroy(){resumed=false;permissionHandler.removeCallbacksAndMessages(null);if(web!=null){web.removeJavascriptInterface("HazelNative");web.destroy();web=null;}io.shutdownNow();super.onDestroy();}
-    @Override public void onBackPressed(){if(alarmPage()){moveTaskToBack(true);return;}if(web!=null)web.evaluateJavascript("window.appBack && window.appBack()",null);else super.onBackPressed();}
-    private void push(){if(web!=null)web.evaluateJavascript("window.refreshNative && window.refreshNative(true)",null);}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);applyRecents();push();}
+    @Override protected void onDestroy(){
+        resumed=false;permissionHandler.removeCallbacksAndMessages(null);
+        if(prefs!=null&&preferenceListener!=null)prefs.raw().unregisterOnSharedPreferenceChangeListener(preferenceListener);
+        io.shutdownNow();super.onDestroy();
+    }
+    private void push(){
+        permissionHandler.removeCallbacks(stateRefresh);permissionHandler.postDelayed(stateRefresh,40);
+    }
     private void refreshPermissionsAfterReturn(){
-        permissionHandler.removeCallbacks(permissionRefresh);
-        if(!resumed||web==null)return;
-        GuardianService.refreshNotifications();
-        push();
-        // OEM settings can publish their final permission state after Activity resume.
+        permissionHandler.removeCallbacks(permissionRefresh);if(!resumed)return;
+        GuardianService.refreshNotifications();push();
         permissionHandler.postDelayed(permissionRefresh,350);
         permissionHandler.postDelayed(permissionRefresh,1200);
         permissionHandler.postDelayed(permissionRefresh,2500);
     }
-    private void reply(String id,boolean ok,Object value){if(web==null)return;JSONObject r=new JSONObject();Prefs.put(r,"ok",ok);Prefs.put(r,ok?"value":"error",value);web.evaluateJavascript("window.NativeReply && window.NativeReply("+JSONObject.quote(id)+","+r.toString()+")",null);}
     private void toast(String text){Toast.makeText(this,text,Toast.LENGTH_LONG).show();}
-    public final class Bridge {
-        @JavascriptInterface public void request(String id,String action,String json){
-            if(id==null||id.length()>80||action==null||action.length()>40||json==null||json.length()>131072)return;
-            runOnUiThread(()->{try{Object result=dispatch(action,new JSONObject(json));reply(id,true,result==null?JSONObject.NULL:result);}catch(Exception e){reply(id,false,e.getMessage()==null?"操作未完成，请重试":e.getMessage());}});
-        }
-    }
     private JSONObject state(){
         JSONObject j=new JSONObject();Prefs.put(j,"config",prefs.config());Prefs.put(j,"enabled",prefs.enabled());Prefs.put(j,"running",GuardianService.running);
         Prefs.put(j,"ringing",GuardianService.ringing);Prefs.put(j,"alarmTest",prefs.raw().getBoolean("alarmTest",false));Prefs.put(j,"alarmTitle",prefs.raw().getString("alarmTitle",""));Prefs.put(j,"alarmUntil",prefs.raw().getLong("alarmUntil",0));
@@ -113,7 +117,12 @@ public class MainActivity extends Activity {
         Prefs.put(j,"notificationRequestAt",prefs.raw().getLong("notificationRequestAt",0));
         Prefs.put(j,"alertMode",NotificationAccess.alertMode(this,prefs).name());Prefs.put(j,"overlayVisible",GuardianService.overlayVisible);
         Prefs.put(j,"watchNotification",NotificationAccess.watchState(this,prefs));
-        Prefs.put(j,"version","1.0.5");Prefs.put(j,"android",Build.VERSION.RELEASE);Prefs.put(j,"manufacturer",Build.MANUFACTURER);Prefs.put(j,"xiaomi",NotificationAccess.isXiaomi());Prefs.put(j,"preview",false);return j;
+        Prefs.put(j,"backgroundPath",prefs.raw().getString("backgroundPath",""));
+        Prefs.put(j,"backgroundName",prefs.raw().getString("backgroundName",""));
+        Prefs.put(j,"recoveryAt",prefs.raw().getLong("recoveryAt",0));
+        Prefs.put(j,"lastRecovery",prefs.raw().getLong("lastRecovery",0));
+        Prefs.put(j,"serviceHeartbeatAt",prefs.raw().getLong("serviceHeartbeatAt",0));
+        Prefs.put(j,"version",BuildConfig.VERSION_NAME);Prefs.put(j,"android",Build.VERSION.RELEASE);Prefs.put(j,"manufacturer",Build.MANUFACTURER);Prefs.put(j,"xiaomi",NotificationAccess.isXiaomi());Prefs.put(j,"preview",false);return j;
     }
     private JSONObject permissions(){
         JSONObject p=new JSONObject();NotificationManager n=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);PowerManager power=(PowerManager)getSystemService(POWER_SERVICE);
@@ -162,11 +171,17 @@ public class MainActivity extends Activity {
                 for(String id:new TreeSet<String>(ZoneId.getAvailableZoneIds())){ZoneId zone=ZoneId.of(id);JSONObject z=new JSONObject();Prefs.put(z,"id",id);Prefs.put(z,"offset",zone.getRules().getOffset(now).toString().replace("Z","+00:00"));Prefs.put(z,"time",now.atZone(zone).toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));zones.put(z);}return zones;
             }
             case "history": return prefs.history();
-            case "save":
-                prefs.update(data);applyTheme();AlarmScheduler.boundaries(this);
-                if(GuardianService.ringing&&NotificationAccess.alertMode(this,prefs)==AlertPolicy.Mode.BLOCKED)
-                    GuardianService.send(this,"DISMISS");
-                if(prefs.enabled())GuardianService.send(this,"CHECK");return prefs.config();
+            case "save":{
+                prefs.update(data);applyTheme();
+                boolean schedule=data.has("windows")||data.has("allDay")||data.has("timezone")||data.has("catchUp");
+                if(schedule)AlarmScheduler.boundaries(this);
+                if(GuardianService.ringing&&NotificationAccess.alertMode(this,prefs)==AlertPolicy.Mode.BLOCKED)GuardianService.send(this,"DISMISS");
+                if(prefs.enabled()&&(schedule||data.has("pollSeconds")||data.has("reliable")||data.has("soundWithoutNotifications")))GuardianService.send(this,"CHECK");
+                if(data.has("recovery")){if(prefs.config().optBoolean("recovery",true))WatchRecovery.schedule(this,true);else WatchRecovery.cancel(this);}
+                return prefs.config();
+            }
+            case "pickBackground":startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"),BACKGROUND);return true;
+            case "removeBackground":BackgroundStore.remove(this,prefs);return true;
             case "toggle":{
                 boolean enable=data.getBoolean("enabled");if(enable)requireAlarmAccess();prefs.setEnabled(enable);
                 if(!GuardianService.send(this,enable?"CHECK":"STOP_WATCH")){if(enable)prefs.setEnabled(false);throw new Exception("系统限制了后台启动，请检查权限后重试");}
@@ -283,11 +298,16 @@ public class MainActivity extends Activity {
                 runOnUiThread(()->toast("排查包未完整保存，请重新导出："+e.getClass().getSimpleName()));
             }});return;
         }
+        if(request==BACKGROUND){
+            toast("正在处理背景图片…");
+            io.execute(()->{try{BackgroundStore.importImage(this,prefs,uri);runOnUiThread(()->{toast("背景已保存，原图片移动后仍可使用");push();});}
+                catch(Exception e){runOnUiThread(()->toast("背景导入失败："+e.getMessage()));}});return;
+        }
         if(request==AUDIO){toast("正在导入铃声…");io.execute(()->importAudio(uri));}
         if(request==EXPORT){String text=pendingExport;io.execute(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException();out.write(text.getBytes("UTF-8"));runOnUiThread(()->toast("备份已导出；自选铃声文件不包含在备份中"));}catch(Exception e){runOnUiThread(()->toast("导出失败，请检查保存位置"));}});}
         if(request==IMPORT)io.execute(()->{
             try{String text=readBounded(uri,1048576);JSONObject backup=new JSONObject(text);if(!"HazelAlarm".equals(backup.optString("app"))||backup.optInt("schema")!=1)throw new IOException("不是有效的满区闹钟备份");JSONObject settings=backup.getJSONObject("settings");if("custom".equals(settings.optString("ringtone"))&&prefs.raw().getString("customPath","").isEmpty())settings.put("ringtone","starlight");
-                runOnUiThread(()->new AlertDialog.Builder(this).setTitle("恢复提醒设置？").setMessage("将替换当前时段和声音设置，不恢复旧通知记录。自选铃声需要另行导入。"+(settings.optBoolean("soundWithoutNotifications")?"此备份会开启通知异常时仍响铃，即使通知未获准也按所选设置播放闹铃。":"")).setNegativeButton("取消",null).setPositiveButton("恢复",(dialog,which)->{try{prefs.update(settings);AlarmScheduler.boundaries(this);if(prefs.enabled())GuardianService.send(this,"CHECK");applyTheme();push();toast("设置已恢复");}catch(Exception e){toast("恢复失败："+e.getMessage());}}).show());
+                runOnUiThread(()->new AlertDialog.Builder(this).setTitle("恢复提醒设置？").setMessage("将替换当前时段和声音设置，不恢复旧通知记录。自选铃声需要另行导入。"+(settings.optBoolean("soundWithoutNotifications")?"此备份会开启通知异常时仍响铃，即使通知未获准也按所选设置播放闹铃。":"")).setNegativeButton("取消",null).setPositiveButton("恢复",(dialog,which)->{try{prefs.update(settings);AlarmScheduler.boundaries(this);if(prefs.enabled())GuardianService.send(this,"CHECK");applyTheme();if(prefs.enabled())WatchRecovery.schedule(this,true);push();toast("设置已恢复");}catch(Exception e){toast("恢复失败："+e.getMessage());}}).show());
             }catch(Exception e){runOnUiThread(()->toast("备份读取失败："+e.getMessage()));}
         });
     }
@@ -304,3 +324,4 @@ public class MainActivity extends Activity {
         }catch(Exception e){dest.delete();runOnUiThread(()->toast("导入失败："+e.getMessage()));}
     }
 }
+

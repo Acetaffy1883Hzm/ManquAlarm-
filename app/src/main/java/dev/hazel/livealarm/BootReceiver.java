@@ -10,6 +10,7 @@ public class BootReceiver extends BroadcastReceiver {
             p.raw().edit().putLong("testAt",0).putLong("snoozeAt",0).apply();
             if(!p.config().optBoolean("boot"))return;
         }
-        if(p.enabled()){p.log("system","守候恢复","系统时间变化、重启或应用更新后恢复检查");GuardianService.send(c,"CHECK");AlarmScheduler.boundaries(c);}
+        if(p.enabled()){p.log("system","守候恢复","系统时间变化、重启或应用更新后恢复检查");GuardianService.send(c,"CHECK");AlarmScheduler.boundaries(c);WatchRecovery.schedule(c,true);}
     }
 }
+

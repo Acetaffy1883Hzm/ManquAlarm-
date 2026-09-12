@@ -1,8 +1,49 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
 android {
     namespace 'dev.hazel.livealarm'
     compileSdk 35
-    defaultConfig { applicationId 'dev.hazel.livealarm'; minSdk 26; targetSdk 35; versionCode 6; versionName '1.0.5' }
-    buildTypes { release { minifyEnabled false } }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    defaultConfig {
+        applicationId 'dev.hazel.livealarm'
+        minSdk 26
+        targetSdk 35
+        versionCode 7
+        versionName '1.1.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        manifestPlaceholders = [appLabel: '满区闹钟']
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix '.preview'
+            versionNameSuffix '-native-preview'
+            manifestPlaceholders = [appLabel: '满区闹钟·原生预览']
+        }
+        release { minifyEnabled false }
+    }
+    buildFeatures { compose true; buildConfig true }
+    // Historical Web UI stays in source history and is not shipped in native APKs.
+    sourceSets { main { assets.srcDirs = [] } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions { jvmTarget = '1.8' }
+    packaging { resources.excludes += ['/META-INF/{AL2.0,LGPL2.1}'] }
+}
+dependencies {
+    implementation platform('androidx.compose:compose-bom:2025.05.01')
+    implementation 'androidx.activity:activity-compose:1.10.1'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.exifinterface:exifinterface:1.3.7'
+    androidTestImplementation platform('androidx.compose:compose-bom:2025.05.01')
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
