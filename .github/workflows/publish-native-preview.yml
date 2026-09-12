@@ -31,8 +31,8 @@ jobs:
           gh run download "$CI_RUN" --repo "$REPO" --name Native-UI-verification-11-1 --dir verification
           cd release-files
           sha256sum --check SHA256SUMS
-          rg -Fx "Commit: $SOURCE_SHA" BUILD-INFO.txt
-          rg -Fx "Run: $CI_RUN" BUILD-INFO.txt
+          grep -Fx "Commit: $SOURCE_SHA" BUILD-INFO.txt
+          grep -Fx "Run: $CI_RUN" BUILD-INFO.txt
       - name: Publish APK and actual Android screenshots as a prerelease
         shell: bash
         run: |
