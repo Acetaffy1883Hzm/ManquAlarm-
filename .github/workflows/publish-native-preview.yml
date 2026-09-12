@@ -1,0 +1,62 @@
+name: Publish verified native preview
+on:
+  push:
+    branches: [release/native-preview-1.1.0]
+    paths: [.github/workflows/publish-native-preview.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-native-preview-1.1.0
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Acetaffy1883Hzm/ManquAlarm-'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: Acetaffy1883Hzm/ManquAlarm-
+      SOURCE_SHA: 8bd618ade4f0dafd3652c3a5bf49180a037429e2
+      CI_RUN: '34700682902'
+      TAG: v1.1.0-native-preview
+    steps:
+      - name: Verify source build and download its exact artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/actions/runs/$CI_RUN" > verified-run.json
+          jq -e --arg sha "$SOURCE_SHA" --arg repo "$REPO" '.conclusion == "success" and .status == "completed" and .head_sha == $sha and .head_repository.full_name == $repo and .path == ".github/workflows/android-ci.yml"' verified-run.json
+          gh run download "$CI_RUN" --repo "$REPO" --name ManquAlarm-native-preview-11-1 --dir release-files
+          gh run download "$CI_RUN" --repo "$REPO" --name Native-UI-verification-11-1 --dir verification
+          cd release-files
+          sha256sum --check SHA256SUMS
+          rg -Fx "Commit: $SOURCE_SHA" BUILD-INFO.txt
+          rg -Fx "Run: $CI_RUN" BUILD-INFO.txt
+      - name: Publish APK and actual Android screenshots as a prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'NOTES'
+          1.1.0 原生界面预览已提供可直接安装的 APK，下载下方 `ManquAlarm-1.1.0-native-preview.apk` 即可，无需解压源码。
+
+          - 守候、时段、声音、设置、记录和响铃页面改为 Kotlin / Compose 原生界面。
+          - 新增 12 种配色、HEX/RGB 自选颜色、Android 12+ 动态颜色、深浅色和 AMOLED 模式。
+          - 支持自选背景图片、背景遮罩与卡片不透明度。
+          - 设置中可隐藏最近任务卡片，减少误划；桌面入口和通知仍保留。
+          - 增加约 15 分钟的定时守候恢复检查。停止守候后取消，外观变化不重启监听。
+
+          使用独立包名 `dev.hazel.livealarm.preview`，桌面名称“满区闹钟·原生预览”，可与 1.0.5 并排安装。使用调试签名，不能覆盖原签名正式版。可在旧版导出 JSON 后导入预览版；铃声和权限需要重新选择、设置。只在准备使用的一版开启守候，避免重复提醒。
+
+          已通过 36,063 项 Java 规则断言、Android 15 模拟器 7 项原生交互与服务测试、APK 编译和签名校验。图片附件为此次模拟器实际截图。
+
+          直播接口、检测间隔、时段判断、场次去重和音频逻辑沿用原有实现。最近任务隐藏不能阻止系统强制停止或厂商清理；系统休眠可能推迟恢复检查。模拟器验证不能代替真机整夜锁屏、实际开播及时性和耗电验证。
+
+          [构建与测试记录](https://github.com/Acetaffy1883Hzm/ManquAlarm-/actions/runs/34700682902) · [使用及迁移说明](https://github.com/Acetaffy1883Hzm/ManquAlarm-/blob/8bd618ade4f0dafd3652c3a5bf49180a037429e2/docs/NATIVE.md)
+          NOTES
+          shots=verification/build/native-screenshots/ManquAlarm-native-screenshots
+          test -f "$shots/01-home-pink.png"
+          test -f "$shots/06-native-alarm.png"
+          gh release create "$TAG" --repo "$REPO" --target "$SOURCE_SHA" --title '满区闹钟 1.1.0 · 原生界面预览' --draft --prerelease --latest=false --notes-file release-notes.md release-files/ManquAlarm-1.1.0-native-preview.apk release-files/SHA256SUMS release-files/BUILD-INFO.txt "$shots"/*.png
+          gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease --latest=false
+          gh release view "$TAG" --repo "$REPO" --json url,isPrerelease,assets
