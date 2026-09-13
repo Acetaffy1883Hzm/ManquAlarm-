@@ -1,0 +1,62 @@
+name: Build native release for local signing
+
+on:
+  push:
+    branches: ['fix/native-1.0.6-artwork']
+    paths:
+      - 'app/**'
+      - '*.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/native-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+          cache-read-only: true
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - name: Run schedule and notification rule checks
+        run: python3 tools/test_core.py
+      - name: Build the actual release package
+        run: gradle --no-daemon --console=plain :app:assembleRelease
+      - name: Collect unsigned release and verification tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/native-release/tools
+          cp app/build/outputs/apk/release/app-release-unsigned.apk build/native-release/ManquAlarm-1.0.6-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" build/native-release/tools/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/35.0.0/aapt2" build/native-release/tools/aapt2
+          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" build/native-release/tools/zipalign
+          if [ -d "$ANDROID_HOME/build-tools/35.0.0/lib64" ]; then
+            cp -R "$ANDROID_HOME/build-tools/35.0.0/lib64" build/native-release/tools/lib64
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging build/native-release/ManquAlarm-1.0.6-unsigned.apk > build/native-release/package.txt
+          printf 'Commit: %s\nVersion: 1.0.6 (8)\nVariant: release, unsigned\n' "$GITHUB_SHA" > build/native-release/BUILD-INFO.txt
+          cd build/native-release
+          sha256sum ManquAlarm-1.0.6-unsigned.apk > SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ManquAlarm-native-release-unsigned-${{ github.run_id }}
+          path: build/native-release/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

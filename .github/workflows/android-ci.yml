@@ -91,10 +91,10 @@ jobs:
           set -euo pipefail
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
           mkdir -p build/ci
-          cp app/build/outputs/apk/debug/app-debug.apk build/ci/ManquAlarm-1.1.0-native-preview.apk
+          cp app/build/outputs/apk/debug/app-debug.apk build/ci/ManquAlarm-1.0.6-native-preview.apk
           printf 'Commit: %s\nRun: %s\nVariant: debug\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > build/ci/BUILD-INFO.txt
           cd build/ci
-          sha256sum ManquAlarm-1.1.0-native-preview.apk > SHA256SUMS
+          sha256sum ManquAlarm-1.0.6-native-preview.apk > SHA256SUMS
 
       - name: Upload the compiled APK
         uses: actions/upload-artifact@v7
