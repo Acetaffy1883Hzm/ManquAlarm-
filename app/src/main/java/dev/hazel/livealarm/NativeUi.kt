@@ -147,11 +147,11 @@ internal fun NativeApp(host: MainActivity, state: JSONObject, alarm: Boolean) {
 @Composable private fun HazelPicture(modifier: Modifier) {
     val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(null) { value = withContext(Dispatchers.IO) {
-        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeResource(context.resources, R.drawable.hazel, o)
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeResource(context.resources, R.drawable.hazel_character, o)
         o.inSampleSize = 1; while (maxOf(o.outWidth, o.outHeight) / o.inSampleSize > 768) o.inSampleSize *= 2
-        o.inJustDecodeBounds = false; BitmapFactory.decodeResource(context.resources, R.drawable.hazel, o)
+        o.inJustDecodeBounds = false; BitmapFactory.decodeResource(context.resources, R.drawable.hazel_character, o)
     } }
-    bitmap?.let { Image(it.asImageBitmap(), "灰泽满", modifier.clip(RoundedCornerShape(24.dp)), contentScale = ContentScale.Fit) }
+    bitmap?.let { Image(it.asImageBitmap(), "灰泽满", modifier, contentScale = ContentScale.Fit) }
 }
 @Composable private fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = LocalCardAlpha.current), contentColor = MaterialTheme.colorScheme.onSurface)) {
