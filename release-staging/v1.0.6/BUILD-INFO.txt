@@ -1,0 +1,9 @@
+App: 满区闹钟
+Package: dev.hazel.livealarm
+Version: 1.0.6
+Version code: 8
+Release target commit: db899889bbb432de5db7cc97b9cdf1e26d648160
+Tested source commit: 886c22f15c53c61a5729985ffd03af1935bbc9ac
+Android CI run: 34734216298
+APK SHA-256: cc59fd3570c90f4b43e95495cba9952897bac8f0faa8927dfb22bbee53db39e1
+Signing certificate SHA-256: 9180b03ac2f5ebb938590317ecc6483d41cec1ec00077884c74723b9a16e0fca

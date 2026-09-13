@@ -1,0 +1,75 @@
+name: Publish ManquAlarm 1.0.6
+on:
+  push:
+    branches: ['release/v1.0.6-publish']
+    paths:
+      - '.github/workflows/publish-v1.0.6.yml'
+      - 'release-staging/v1.0.6/**'
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-manqu-alarm-v1.0.6
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Acetaffy1883Hzm/ManquAlarm-'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: Acetaffy1883Hzm/ManquAlarm-
+      TAG: v1.0.6
+      TARGET_SHA: db899889bbb432de5db7cc97b9cdf1e26d648160
+      TESTED_SHA: 886c22f15c53c61a5729985ffd03af1935bbc9ac
+      CI_RUN: '34734216298'
+      CERT_SHA256: 9180b03ac2f5ebb938590317ecc6483d41cec1ec00077884c74723b9a16e0fca
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - name: Reassemble and verify the exact signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-files
+          cat release-staging/v1.0.6/chunks/part-* > release-files/ManquAlarm-1.0.6.apk
+          cp release-staging/v1.0.6/SHA256SUMS release-staging/v1.0.6/BUILD-INFO.txt release-files/
+          (cd release-files && sha256sum --check SHA256SUMS)
+          apksigner="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          aapt2="$ANDROID_HOME/build-tools/35.0.0/aapt2"
+          zipalign="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          "$apksigner" verify --verbose --print-certs release-files/ManquAlarm-1.0.6.apk > release-files/APK-VERIFICATION.txt
+          grep -Fxi "Signer #1 certificate SHA-256 digest: $CERT_SHA256" release-files/APK-VERIFICATION.txt
+          grep -Fx 'Verified using v2 scheme (APK Signature Scheme v2): true' release-files/APK-VERIFICATION.txt
+          grep -Fx 'Verified using v3 scheme (APK Signature Scheme v3): true' release-files/APK-VERIFICATION.txt
+          "$zipalign" -c -P 16 4 release-files/ManquAlarm-1.0.6.apk
+          "$aapt2" dump badging release-files/ManquAlarm-1.0.6.apk > release-files/PACKAGE-INFO.txt
+          grep -F "package: name='dev.hazel.livealarm' versionCode='8' versionName='1.0.6'" release-files/PACKAGE-INFO.txt
+      - name: Verify the tested source run and obtain screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/actions/runs/$CI_RUN" > verified-run.json
+          jq -e --arg sha "$TESTED_SHA" --arg repo "$REPO" '.conclusion == "success" and .status == "completed" and .head_sha == $sha and .head_repository.full_name == $repo and .path == ".github/workflows/android-ci.yml"' verified-run.json
+          gh run download "$CI_RUN" --repo "$REPO" --name Native-UI-verification-17-1 --dir verification
+          test -f verification/build/native-screenshots/ManquAlarm-native-screenshots/01-home-pink.png
+          test -f verification/build/native-screenshots/ManquAlarm-native-screenshots/06-native-alarm.png
+      - name: Publish the official release
+        shell: bash
+        run: |
+          set -euo pipefail
+          shots=verification/build/native-screenshots/ManquAlarm-native-screenshots
+          assets=(release-files/ManquAlarm-1.0.6.apk release-files/SHA256SUMS release-files/BUILD-INFO.txt release-files/APK-VERIFICATION.txt release-files/PACKAGE-INFO.txt "$shots"/*.png)
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$REPO" --clobber "${assets[@]}"
+            gh release edit "$TAG" --repo "$REPO" --target "$TARGET_SHA" --title '满区闹钟 1.0.6 · 原生正式版' --notes-file release-staging/v1.0.6/RELEASE-NOTES.md --draft=false --prerelease=false --latest
+          else
+            gh release create "$TAG" --repo "$REPO" --target "$TARGET_SHA" --title '满区闹钟 1.0.6 · 原生正式版' --notes-file release-staging/v1.0.6/RELEASE-NOTES.md --draft --latest "${assets[@]}"
+            gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease=false --latest
+          fi
+          gh release view "$TAG" --repo "$REPO" --json url,isDraft,isPrerelease,isLatest,tagName,targetCommitish,assets
