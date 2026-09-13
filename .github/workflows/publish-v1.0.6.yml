@@ -72,4 +72,4 @@ jobs:
             gh release create "$TAG" --repo "$REPO" --target "$TARGET_SHA" --title '满区闹钟 1.0.6 · 原生正式版' --notes-file release-staging/v1.0.6/RELEASE-NOTES.md --draft --latest "${assets[@]}"
             gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease=false --latest
           fi
-          gh release view "$TAG" --repo "$REPO" --json url,isDraft,isPrerelease,isLatest,tagName,targetCommitish,assets
+          gh release view "$TAG" --repo "$REPO" --json url,isDraft,isPrerelease,tagName,targetCommitish,assets
